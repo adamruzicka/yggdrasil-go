@@ -156,7 +156,7 @@ func (m *Multicast) _updateConfig(config *config.NodeConfig) {
 	m.log.Debugln("Reloaded multicast configuration successfully")
 }
 
-// GetInterfaces returns the currently known/enabled multicast interfaces. It is
+// Interfaces returns the currently known/enabled multicast interfaces. It is
 // expected that UpdateInterfaces has been called at least once before calling
 // this method.
 func (m *Multicast) Interfaces() map[string]net.Interface {
