@@ -15,6 +15,6 @@ type Module interface {
 	Start() error
 	Stop() error
 	UpdateConfig(config *config.NodeConfig)
-	SetupAdminHandlers(a *admin.AdminSocket)
+	SetupAdminHandlers(a *admin.Socket)
 	IsStarted() bool
 }

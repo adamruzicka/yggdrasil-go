@@ -37,7 +37,7 @@ type node struct {
 	state     *config.NodeState
 	tuntap    module.Module // tuntap.TunAdapter
 	multicast module.Module // multicast.Multicast
-	admin     module.Module // admin.AdminSocket
+	admin     module.Module // admin.Socket
 }
 
 func readConfig(useconf *bool, useconffile *string, normaliseconf *bool) *config.NodeConfig {
@@ -281,7 +281,7 @@ func main() {
 	// Register the session firewall gatekeeper function
 	n.core.SetSessionGatekeeper(n.sessionFirewall)
 	// Allocate our modules
-	n.admin = &admin.AdminSocket{}
+	n.admin = &admin.Socket{}
 	n.multicast = &multicast.Multicast{}
 	n.tuntap = &tuntap.TunAdapter{}
 	// Start the admin socket
@@ -289,13 +289,13 @@ func main() {
 	if err := n.admin.Start(); err != nil {
 		logger.Errorln("An error occurred starting admin socket:", err)
 	}
-	n.admin.SetupAdminHandlers(n.admin.(*admin.AdminSocket))
+	n.admin.SetupAdminHandlers(n.admin.(*admin.Socket))
 	// Start the multicast interface
 	n.multicast.Init(&n.core, n.state, logger, nil)
 	if err := n.multicast.Start(); err != nil {
 		logger.Errorln("An error occurred starting multicast:", err)
 	}
-	n.multicast.SetupAdminHandlers(n.admin.(*admin.AdminSocket))
+	n.multicast.SetupAdminHandlers(n.admin.(*admin.Socket))
 	// Start the TUN/TAP interface
 	if listener, err := n.core.ConnListen(); err == nil {
 		if dialer, err := n.core.ConnDialer(); err == nil {
@@ -303,7 +303,7 @@ func main() {
 			if err := n.tuntap.Start(); err != nil {
 				logger.Errorln("An error occurred starting TUN/TAP:", err)
 			}
-			n.tuntap.SetupAdminHandlers(n.admin.(*admin.AdminSocket))
+			n.tuntap.SetupAdminHandlers(n.admin.(*admin.Socket))
 		} else {
 			logger.Errorln("Unable to get Dialer:", err)
 		}

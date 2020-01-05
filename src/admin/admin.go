@@ -24,7 +24,7 @@ import (
 
 // TODO: Add authentication
 
-type AdminSocket struct {
+type Socket struct {
 	core       *yggdrasil.Core
 	log        *log.Logger
 	listenaddr string
@@ -42,7 +42,7 @@ type handler struct {
 }
 
 // AddHandler is called for each admin function to add the handler and help documentation to the API.
-func (a *AdminSocket) AddHandler(name string, args []string, handlerfunc func(Info) (Info, error)) error {
+func (a *Socket) AddHandler(name string, args []string, handlerfunc func(Info) (Info, error)) error {
 	if _, ok := a.handlers[strings.ToLower(name)]; ok {
 		return errors.New("handler already exists")
 	}
@@ -53,8 +53,8 @@ func (a *AdminSocket) AddHandler(name string, args []string, handlerfunc func(In
 	return nil
 }
 
-// init runs the initial admin setup.
-func (a *AdminSocket) Init(c *yggdrasil.Core, state *config.NodeState, log *log.Logger, options interface{}) error {
+// Init runs the initial admin setup.
+func (a *Socket) Init(c *yggdrasil.Core, state *config.NodeState, log *log.Logger, options interface{}) error {
 	a.core = c
 	a.log = log
 	a.handlers = make(map[string]handler)
@@ -70,7 +70,7 @@ func (a *AdminSocket) Init(c *yggdrasil.Core, state *config.NodeState, log *log.
 	return nil
 }
 
-func (a *AdminSocket) UpdateConfig(config *config.NodeConfig) {
+func (a *Socket) UpdateConfig(config *config.NodeConfig) {
 	a.log.Debugln("Reloading admin configuration...")
 	if a.listenaddr != config.AdminListen {
 		a.listenaddr = config.AdminListen
@@ -81,7 +81,7 @@ func (a *AdminSocket) UpdateConfig(config *config.NodeConfig) {
 	}
 }
 
-func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
+func (a *Socket) SetupAdminHandlers(na *Socket) {
 	a.AddHandler("getSelf", []string{}, func(in Info) (Info, error) {
 		ip := a.core.Address().String()
 		subnet := a.core.Subnet()
@@ -181,13 +181,12 @@ func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
 					in["uri"].(string),
 				},
 			}, nil
-		} else {
-			return Info{
-				"not_added": []string{
-					in["uri"].(string),
-				},
-			}, errors.New("Failed to add peer")
 		}
+		return Info{
+			"not_added": []string{
+				in["uri"].(string),
+			},
+		}, errors.New("Failed to add peer")
 	})
 	a.AddHandler("removePeer", []string{"port"}, func(in Info) (Info, error) {
 		port, err := strconv.ParseInt(fmt.Sprint(in["port"]), 10, 64)
@@ -200,13 +199,12 @@ func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
 					fmt.Sprint(port),
 				},
 			}, nil
-		} else {
-			return Info{
-				"not_removed": []string{
-					fmt.Sprint(port),
-				},
-			}, errors.New("Failed to remove peer")
 		}
+		return Info{
+			"not_removed": []string{
+				fmt.Sprint(port),
+			},
+		}, errors.New("Failed to remove peer")
 	})
 	a.AddHandler("getAllowedEncryptionPublicKeys", []string{}, func(in Info) (Info, error) {
 		return Info{"allowed_box_pubs": a.core.GetAllowedEncryptionPublicKeys()}, nil
@@ -218,13 +216,12 @@ func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
 					in["box_pub_key"].(string),
 				},
 			}, nil
-		} else {
-			return Info{
-				"not_added": []string{
-					in["box_pub_key"].(string),
-				},
-			}, errors.New("Failed to add allowed key")
 		}
+		return Info{
+			"not_added": []string{
+				in["box_pub_key"].(string),
+			},
+		}, errors.New("Failed to add allowed key")
 	})
 	a.AddHandler("removeAllowedEncryptionPublicKey", []string{"box_pub_key"}, func(in Info) (Info, error) {
 		if a.core.RemoveAllowedEncryptionPublicKey(in["box_pub_key"].(string)) == nil {
@@ -233,13 +230,12 @@ func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
 					in["box_pub_key"].(string),
 				},
 			}, nil
-		} else {
-			return Info{
-				"not_removed": []string{
-					in["box_pub_key"].(string),
-				},
-			}, errors.New("Failed to remove allowed key")
 		}
+		return Info{
+			"not_removed": []string{
+				in["box_pub_key"].(string),
+			},
+		}, errors.New("Failed to remove allowed key")
 	})
 	a.AddHandler("dhtPing", []string{"box_pub_key", "coords", "[target]"}, func(in Info) (Info, error) {
 		var reserr error
@@ -287,9 +283,8 @@ func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
 			var jsoninfo interface{}
 			if err := json.Unmarshal(nodeinfo, &jsoninfo); err != nil {
 				return Info{}, err
-			} else {
-				return Info{"nodeinfo": jsoninfo}, nil
 			}
+			return Info{"nodeinfo": jsoninfo}, nil
 		} else if in["box_pub_key"] == nil || in["coords"] == nil {
 			return Info{}, errors.New("Expecting both box_pub_key and coords")
 		} else {
@@ -305,17 +300,15 @@ func (a *AdminSocket) SetupAdminHandlers(na *AdminSocket) {
 			var m map[string]interface{}
 			if err = json.Unmarshal(result, &m); err == nil {
 				return Info{"nodeinfo": m}, nil
-			} else {
-				return Info{}, err
 			}
-		} else {
 			return Info{}, err
 		}
+		return Info{}, err
 	})
 }
 
 // Start runs the admin API socket to listen for / respond to admin API calls.
-func (a *AdminSocket) Start() error {
+func (a *Socket) Start() error {
 	if a.listenaddr != "none" && a.listenaddr != "" {
 		go a.listen()
 		a.started = true
@@ -324,22 +317,21 @@ func (a *AdminSocket) Start() error {
 }
 
 // IsStarted returns true if the module has been started.
-func (a *AdminSocket) IsStarted() bool {
+func (a *Socket) IsStarted() bool {
 	return a.started
 }
 
 // Stop will stop the admin API and close the socket.
-func (a *AdminSocket) Stop() error {
+func (a *Socket) Stop() error {
 	if a.listener != nil {
 		a.started = false
 		return a.listener.Close()
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // listen is run by start and manages API connections.
-func (a *AdminSocket) listen() {
+func (a *Socket) listen() {
 	u, err := url.Parse(a.listenaddr)
 	if err == nil {
 		switch strings.ToLower(u.Scheme) {
@@ -394,7 +386,7 @@ func (a *AdminSocket) listen() {
 }
 
 // handleRequest calls the request handler for each request sent to the admin API.
-func (a *AdminSocket) handleRequest(conn net.Conn) {
+func (a *Socket) handleRequest(conn net.Conn) {
 	decoder := json.NewDecoder(conn)
 	encoder := json.NewEncoder(conn)
 	encoder.SetIndent("", "  ")

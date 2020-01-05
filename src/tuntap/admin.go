@@ -9,7 +9,7 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
 )
 
-func (t *TunAdapter) SetupAdminHandlers(a *admin.AdminSocket) {
+func (t *TunAdapter) SetupAdminHandlers(a *admin.Socket) {
 	a.AddHandler("getTunTap", []string{}, func(in admin.Info) (r admin.Info, e error) {
 		defer func() {
 			if err := recover(); err != nil {
