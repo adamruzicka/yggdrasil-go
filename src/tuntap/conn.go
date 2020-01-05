@@ -27,10 +27,10 @@ type tunConn struct {
 }
 
 func (s *tunConn) close() {
-	s.tun.Act(s, s._close_from_tun)
+	s.tun.Act(s, s._closeFromTun)
 }
 
-func (s *tunConn) _close_from_tun() {
+func (s *tunConn) _closeFromTun() {
 	go s.conn.Close() // Just in case it blocks on actor operations
 	delete(s.tun.addrToConn, s.addr)
 	delete(s.tun.subnetToConn, s.snet)

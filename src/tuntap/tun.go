@@ -27,7 +27,7 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/yggdrasil"
 )
 
-const tun_IPv6_HEADER_LENGTH = 40
+const tunIPv6HeaderLength = 40
 
 // TunAdapter represents a running TUN interface and extends the
 // yggdrasil.Adapter type. In order to use the TUN adapter with Yggdrasil, you
@@ -257,10 +257,10 @@ func (tun *TunAdapter) _wrap(conn *yggdrasil.Conn) (c *tunConn, err error) {
 	// If we know about a connection for this destination already then assume it
 	// is no longer valid and close it
 	if aok {
-		atc._close_from_tun()
+		atc._closeFromTun()
 		err = errors.New("replaced connection for address")
 	} else if sok {
-		stc._close_from_tun()
+		stc._closeFromTun()
 		err = errors.New("replaced connection for subnet")
 	}
 	// Save the session wrapper so that we can look it up quickly next time

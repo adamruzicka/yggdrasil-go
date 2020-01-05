@@ -20,10 +20,10 @@ import (
 type cryptokey struct {
 	tun          *TunAdapter
 	enabled      atomic.Value // bool
-	ipv4remotes  []cryptokey_route
-	ipv6remotes  []cryptokey_route
-	ipv4cache    map[address.Address]cryptokey_route
-	ipv6cache    map[address.Address]cryptokey_route
+	ipv4remotes  []cryptokeyRoute
+	ipv6remotes  []cryptokeyRoute
+	ipv4cache    map[address.Address]cryptokeyRoute
+	ipv6cache    map[address.Address]cryptokeyRoute
 	ipv4locals   []net.IPNet
 	ipv6locals   []net.IPNet
 	mutexremotes sync.RWMutex
@@ -31,7 +31,7 @@ type cryptokey struct {
 	mutexlocals  sync.RWMutex
 }
 
-type cryptokey_route struct {
+type cryptokeyRoute struct {
 	subnet      net.IPNet
 	destination crypto.BoxPubKey
 }
@@ -51,8 +51,8 @@ func (c *cryptokey) configure() {
 
 	// Clear out existing routes
 	c.mutexremotes.Lock()
-	c.ipv6remotes = make([]cryptokey_route, 0)
-	c.ipv4remotes = make([]cryptokey_route, 0)
+	c.ipv6remotes = make([]cryptokeyRoute, 0)
+	c.ipv4remotes = make([]cryptokeyRoute, 0)
 	c.mutexremotes.Unlock()
 
 	// Add IPv6 routes
@@ -93,8 +93,8 @@ func (c *cryptokey) configure() {
 
 	// Wipe the caches
 	c.mutexcaches.Lock()
-	c.ipv4cache = make(map[address.Address]cryptokey_route, 0)
-	c.ipv6cache = make(map[address.Address]cryptokey_route, 0)
+	c.ipv4cache = make(map[address.Address]cryptokeyRoute, 0)
+	c.ipv6cache = make(map[address.Address]cryptokeyRoute, 0)
 	c.mutexcaches.Unlock()
 }
 
@@ -199,8 +199,8 @@ func (c *cryptokey) addRemoteSubnet(cidr string, dest string) error {
 	_, prefixsize := ipnet.Mask.Size()
 
 	// Build our references to the routing table and cache
-	var routingtable *[]cryptokey_route
-	var routingcache *map[address.Address]cryptokey_route
+	var routingtable *[]cryptokeyRoute
+	var routingcache *map[address.Address]cryptokeyRoute
 
 	// Check if the prefix is IPv4 or IPv6
 	if prefixsize == net.IPv6len*8 {
@@ -236,7 +236,7 @@ func (c *cryptokey) addRemoteSubnet(cidr string, dest string) error {
 		// Add the new crypto-key route
 		var key crypto.BoxPubKey
 		copy(key[:], bpk)
-		*routingtable = append(*routingtable, cryptokey_route{
+		*routingtable = append(*routingtable, cryptokeyRoute{
 			subnet:      *ipnet,
 			destination: key,
 		})
@@ -271,8 +271,8 @@ func (c *cryptokey) getPublicKeyForAddress(addr address.Address, addrlen int) (c
 	}
 
 	// Build our references to the routing table and cache
-	var routingtable *[]cryptokey_route
-	var routingcache *map[address.Address]cryptokey_route
+	var routingtable *[]cryptokeyRoute
+	var routingcache *map[address.Address]cryptokeyRoute
 
 	// Check if the prefix is IPv4 or IPv6
 	if addrlen == net.IPv6len {
@@ -393,8 +393,8 @@ func (c *cryptokey) removeRemoteSubnet(cidr string, dest string) error {
 	_, prefixsize := ipnet.Mask.Size()
 
 	// Build our references to the routing table and cache
-	var routingtable *[]cryptokey_route
-	var routingcache *map[address.Address]cryptokey_route
+	var routingtable *[]cryptokeyRoute
+	var routingcache *map[address.Address]cryptokeyRoute
 
 	// Check if the prefix is IPv4 or IPv6
 	if prefixsize == net.IPv6len*8 {

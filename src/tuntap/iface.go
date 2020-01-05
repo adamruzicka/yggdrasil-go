@@ -9,7 +9,7 @@ import (
 	"github.com/Arceliar/phony"
 )
 
-const TUN_OFFSET_BYTES = 4
+const TunOffsetBytes = 4
 
 type tunWriter struct {
 	phony.Inbox
@@ -32,9 +32,9 @@ func (w *tunWriter) _write(b []byte) {
 	if n == 0 {
 		return
 	}
-	temp := append(util.ResizeBytes(util.GetBytes(), TUN_OFFSET_BYTES), b...)
+	temp := append(util.ResizeBytes(util.GetBytes(), TunOffsetBytes), b...)
 	defer util.PutBytes(temp)
-	written, err = w.tun.iface.Write(temp, TUN_OFFSET_BYTES)
+	written, err = w.tun.iface.Write(temp, TunOffsetBytes)
 	if err != nil {
 		w.tun.Act(w, func() {
 			if !w.tun.isOpen {
@@ -42,9 +42,9 @@ func (w *tunWriter) _write(b []byte) {
 			}
 		})
 	}
-	if written != n+TUN_OFFSET_BYTES {
+	if written != n+TunOffsetBytes {
 		// FIXME some platforms return the wrong number of bytes written, causing error spam
-		//w.tun.log.Errorln("TUN iface write mismatch:", written, "bytes written vs", n+TUN_OFFSET_BYTES, "bytes given")
+		//w.tun.log.Errorln("TUN iface write mismatch:", written, "bytes written vs", n+TunOffsetBytes, "bytes given")
 	}
 }
 
@@ -55,10 +55,10 @@ type tunReader struct {
 
 func (r *tunReader) _read() {
 	// Get a slice to store the packet in
-	recvd := util.ResizeBytes(util.GetBytes(), r.tun.mtu+TUN_OFFSET_BYTES)
+	recvd := util.ResizeBytes(util.GetBytes(), r.tun.mtu+TunOffsetBytes)
 	// Wait for a packet to be delivered to us through the TUN adapter
-	n, err := r.tun.iface.Read(recvd, TUN_OFFSET_BYTES)
-	if n <= TUN_OFFSET_BYTES || err != nil {
+	n, err := r.tun.iface.Read(recvd, TunOffsetBytes)
+	if n <= TunOffsetBytes || err != nil {
 		r.tun.log.Errorln("Error reading TUN:", err)
 		ferr := r.tun.iface.Flush()
 		if ferr != nil {
@@ -66,7 +66,7 @@ func (r *tunReader) _read() {
 		}
 		util.PutBytes(recvd)
 	} else {
-		r.tun.handlePacketFrom(r, recvd[TUN_OFFSET_BYTES:n+TUN_OFFSET_BYTES], err)
+		r.tun.handlePacketFrom(r, recvd[TunOffsetBytes:n+TunOffsetBytes], err)
 	}
 	if err == nil {
 		// Now read again
@@ -110,7 +110,7 @@ func (tun *TunAdapter) _handlePacket(recvd []byte, err error) {
 			return
 		}
 		// Check the packet size
-		if n-tun_IPv6_HEADER_LENGTH != 256*int(bs[4])+int(bs[5]) {
+		if n-tunIPv6HeaderLength != 256*int(bs[4])+int(bs[5]) {
 			return
 		}
 		// IPv6 address
