@@ -4,8 +4,8 @@ package defaults
 
 // Sane defaults for the other platforms. The "default" options may be
 // may be replaced by the running configuration.
-func GetDefaults() platformDefaultParameters {
-	return platformDefaultParameters{
+func GetDefaults() PlatformDefaultParameters {
+	return PlatformDefaultParameters{
 		// Admin
 		DefaultAdminListen: "tcp://localhost:9001",
 
