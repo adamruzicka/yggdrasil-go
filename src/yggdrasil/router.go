@@ -139,9 +139,9 @@ func (r *router) _handlePacket(packet []byte) {
 		return
 	}
 	switch pType {
-	case wire_Traffic:
+	case wireTraffic:
 		r._handleTraffic(packet)
-	case wire_ProtocolTraffic:
+	case wireProtocolTraffic:
 		r._handleProto(packet)
 	default:
 	}
@@ -190,9 +190,9 @@ func (r *router) _handleProto(packet []byte) {
 		return
 	}
 	switch bsType {
-	case wire_SessionPing:
+	case wireSessionPing:
 		r._handlePing(bs, &p.FromKey)
-	case wire_SessionPong:
+	case wireSessionPong:
 		r._handlePong(bs, &p.FromKey)
 	case wire_NodeInfoRequest:
 		fallthrough

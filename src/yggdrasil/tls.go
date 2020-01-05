@@ -18,17 +18,17 @@ import (
 type tcptls struct {
 	tcp         *tcp
 	config      *tls.Config
-	forDialer   *TcpUpgrade
-	forListener *TcpUpgrade
+	forDialer   *TCPUpgrade
+	forListener *TCPUpgrade
 }
 
 func (t *tcptls) init(tcp *tcp) {
 	t.tcp = tcp
-	t.forDialer = &TcpUpgrade{
+	t.forDialer = &TCPUpgrade{
 		upgrade: t.upgradeDialer,
 		name:    "tls",
 	}
-	t.forListener = &TcpUpgrade{
+	t.forListener = &TCPUpgrade{
 		upgrade: t.upgradeListener,
 		name:    "tls",
 	}

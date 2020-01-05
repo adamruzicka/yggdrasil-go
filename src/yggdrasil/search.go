@@ -23,12 +23,12 @@ import (
 )
 
 // This defines the maximum number of dhtInfo that we keep track of for nodes to query in an ongoing search.
-const search_MAX_SEARCH_SIZE = 16
+const searchMaxSearchSize = 16
 
 // This defines the time after which we send a new search packet.
 // Search packets are sent automatically immediately after a response is received.
 // So this allows for timeouts and for long searches to become increasingly parallel.
-const search_RETRY_TIME = time.Second
+const searchRetryTime = time.Second
 
 // Information about an ongoing search.
 // Includes the target NodeID, the bitmask to match it to an IP, and the list of nodes to visit / already visited.
@@ -99,7 +99,7 @@ func (sinfo *searchInfo) addToSearch(res *dhtRes) {
 		if *info.getNodeID() == sinfo.searches.router.dht.nodeID || sinfo.visited[*info.getNodeID()] {
 			continue
 		}
-		if dht_ordered(&sinfo.dest, info.getNodeID(), from.getNodeID()) {
+		if dhtOrdered(&sinfo.dest, info.getNodeID(), from.getNodeID()) {
 			// Response is closer to the destination
 			sinfo.toVisit = append(sinfo.toVisit, info)
 		}
@@ -116,11 +116,11 @@ func (sinfo *searchInfo) addToSearch(res *dhtRes) {
 	// Sort
 	sort.SliceStable(sinfo.toVisit, func(i, j int) bool {
 		// Should return true if i is closer to the destination than j
-		return dht_ordered(&res.Dest, sinfo.toVisit[i].getNodeID(), sinfo.toVisit[j].getNodeID())
+		return dhtOrdered(&res.Dest, sinfo.toVisit[i].getNodeID(), sinfo.toVisit[j].getNodeID())
 	})
 	// Truncate to some maximum size
-	if len(sinfo.toVisit) > search_MAX_SEARCH_SIZE {
-		sinfo.toVisit = sinfo.toVisit[:search_MAX_SEARCH_SIZE]
+	if len(sinfo.toVisit) > searchMaxSearchSize {
+		sinfo.toVisit = sinfo.toVisit[:searchMaxSearchSize]
 	}
 }
 
@@ -128,7 +128,7 @@ func (sinfo *searchInfo) addToSearch(res *dhtRes) {
 // Otherwise, it pops the closest node to the destination (in keyspace) off of the toVisit list and sends a dht ping.
 func (sinfo *searchInfo) doSearchStep() {
 	if len(sinfo.toVisit) == 0 {
-		if time.Since(sinfo.time) > search_RETRY_TIME {
+		if time.Since(sinfo.time) > searchRetryTime {
 			// Dead end and no response in too long, do cleanup
 			delete(sinfo.searches.searches, sinfo.dest)
 			sinfo.callback(nil, errors.New("search reached dead end"))
@@ -145,13 +145,13 @@ func (sinfo *searchInfo) doSearchStep() {
 }
 
 // If we've recently sent a ping for this search, do nothing.
-// Otherwise, doSearchStep and schedule another continueSearch to happen after search_RETRY_TIME.
+// Otherwise, doSearchStep and schedule another continueSearch to happen after searchRetryTime.
 func (sinfo *searchInfo) continueSearch() {
 	sinfo.doSearchStep()
 	// In case the search dies, try to spawn another thread later
 	// Note that this will spawn multiple parallel searches as time passes
 	// Any that die aren't restarted, but a new one will start later
-	time.AfterFunc(search_RETRY_TIME, func() {
+	time.AfterFunc(searchRetryTime, func() {
 		sinfo.searches.router.Act(nil, func() {
 			// FIXME this keeps the search alive forever if not for the searches map, fix that
 			newSearchInfo := sinfo.searches.searches[sinfo.dest]

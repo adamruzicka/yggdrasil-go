@@ -24,10 +24,10 @@ import (
 )
 
 const (
-	switch_timeout          = time.Minute
-	switch_updateInterval   = switch_timeout / 2
-	switch_throttle         = switch_updateInterval / 2
-	switch_faster_threshold = 240 //Number of switch updates before switching to a faster parent
+	switchTimeout          = time.Minute
+	switchUpdateInterval   = switchTimeout / 2
+	switchThrottle         = switchUpdateInterval / 2
+	switchFasterThreshold = 240 //Number of switch updates before switching to a faster parent
 )
 
 // The switch locator represents the topology and network state dependent info about a node, minus the signatures that go with it.
@@ -109,15 +109,15 @@ func (l *switchLocator) getCoords() []byte {
 
 // Returns true if this locator represents an ancestor of the locator given as an argument.
 // Ancestor means that it's the parent node, or the parent of parent, and so on...
-func (x *switchLocator) isAncestorOf(y *switchLocator) bool {
-	if x.root != y.root {
+func (l *switchLocator) isAncestorOf(y *switchLocator) bool {
+	if l.root != y.root {
 		return false
 	}
-	if len(x.coords) > len(y.coords) {
+	if len(l.coords) > len(y.coords) {
 		return false
 	}
-	for idx := range x.coords {
-		if x.coords[idx] != y.coords[idx] {
+	for idx := range l.coords {
+		if l.coords[idx] != y.coords[idx] {
 			return false
 		}
 	}
@@ -175,12 +175,12 @@ type switchTable struct {
 	updater     atomic.Value               // *sync.Once
 	table       atomic.Value               // lookupTable
 	phony.Inbox                            // Owns the below
-	queues      switch_buffers             // Queues - not atomic so ONLY use through the actor
+	queues      switchBuffers             // Queues - not atomic so ONLY use through the actor
 	idle        map[switchPort]struct{}    // idle peers - not atomic so ONLY use through the actor
 	sending     map[switchPort]struct{}    // peers known to be blocked in a send (somehow)
 }
 
-// Minimum allowed total size of switch queues.
+// SwitchQueueTotalMinSize represents the minimum allowed total size of switch queues.
 const SwitchQueueTotalMinSize = 4 * 1024 * 1024
 
 // Initializes the switchTable struct.
@@ -202,7 +202,7 @@ func (t *switchTable) init(core *Core) {
 			t.queues.totalMaxSize = SwitchQueueTotalMinSize
 		}
 		core.config.Mutex.RUnlock()
-		t.queues.bufs = make(map[string]switch_buffer)
+		t.queues.bufs = make(map[string]switchBuffer)
 		t.idle = make(map[switchPort]struct{})
 		t.sending = make(map[switchPort]struct{})
 	})
@@ -236,7 +236,7 @@ func (t *switchTable) cleanRoot() {
 	// Get rid of the root if it looks like its timed out
 	now := time.Now()
 	doUpdate := false
-	if now.Sub(t.time) > switch_timeout {
+	if now.Sub(t.time) > switchTimeout {
 		dropped := t.data.peers[t.parent]
 		dropped.time = t.time
 		t.drop[t.data.locator.root] = t.data.locator.tstamp
@@ -248,7 +248,7 @@ func (t *switchTable) cleanRoot() {
 	}
 	// Or, if we are the root, possibly update our timestamp
 	if t.data.locator.root == t.key &&
-		now.Sub(t.time) > switch_updateInterval {
+		now.Sub(t.time) > switchUpdateInterval {
 		doUpdate = true
 	}
 	if doUpdate {
@@ -434,10 +434,10 @@ func (t *switchTable) unlockedHandleMsg(msg *switchMsg, fromPort switchPort, rep
 				continue
 			} else if sender.locator.root != peer.locator.root || sender.locator.tstamp > peer.locator.tstamp {
 				// We were faster than this node, so increment, as long as we don't overflow because of it
-				if oldSender.faster[peer.port] < switch_faster_threshold {
+				if oldSender.faster[peer.port] < switchFasterThreshold {
 					sender.faster[port] = oldSender.faster[peer.port] + 1
 				} else {
-					sender.faster[port] = switch_faster_threshold
+					sender.faster[port] = switchFasterThreshold
 				}
 			} else {
 				// Slower than this node, penalize (more than the reward amount)
@@ -483,7 +483,7 @@ func (t *switchTable) unlockedHandleMsg(msg *switchMsg, fromPort switchPort, rep
 	case noParent:
 		// We currently have no working parent, and at this point in the switch statement, anything is better than nothing.
 		updateRoot = true
-	case sender.faster[t.parent] >= switch_faster_threshold:
+	case sender.faster[t.parent] >= switchFasterThreshold:
 		// The is reliably faster than the current parent.
 		updateRoot = true
 	case !sender.blocked && oldParent.blocked:
@@ -510,7 +510,7 @@ func (t *switchTable) unlockedHandleMsg(msg *switchMsg, fromPort switchPort, rep
 		}
 		// Process the sender last, to avoid keeping them as a parent if at all possible.
 		t.unlockedHandleMsg(&sender.msg, sender.port, true)
-	case now.Sub(t.time) < switch_throttle:
+	case now.Sub(t.time) < switchThrottle:
 		// We've already gotten an update from this root recently, so ignore this one to avoid flooding.
 	case sender.locator.tstamp > t.data.locator.tstamp:
 		// The timestamp was updated, so we need to update locally and send to our peers.
@@ -615,13 +615,12 @@ func (t *switchTable) portIsCloser(dest []byte, port switchPort) bool {
 		theirDist := info.locator.dist(dest)
 		myDist := table.self.dist(dest)
 		return theirDist < myDist
-	} else {
-		return false
 	}
+	return false
 }
 
 // Get the coords of a packet without decoding
-func switch_getPacketCoords(packet []byte) []byte {
+func switchGetPacketCoords(packet []byte) []byte {
 	_, pTypeLen := wire_decode_uint64(packet)
 	coords, _ := wire_decode_coords(packet[pTypeLen:])
 	return coords
@@ -633,12 +632,12 @@ func switch_getPacketCoords(packet []byte) []byte {
 // Currently, it's the IPv6 next header type and the first 2 uint16 of the next header
 // This is equivalent to the TCP/UDP protocol numbers and the source / dest ports
 // TODO figure out if something else would make more sense (other transport protocols?)
-func switch_getPacketStreamID(packet []byte) string {
-	return string(switch_getPacketCoords(packet))
+func switchGetPacketStreamID(packet []byte) string {
+	return string(switchGetPacketCoords(packet))
 }
 
 // Returns the flowlabel from a given set of coords
-func switch_getFlowLabelFromCoords(in []byte) []byte {
+func switchGetFlowLabelFromCoords(in []byte) []byte {
 	for i, v := range in {
 		if v == 0 {
 			return in[i+1:]
@@ -667,7 +666,7 @@ func (t *switchTable) bestPortForCoords(coords []byte) switchPort {
 // Either send it to ourself, or to the first idle peer that's free
 // Returns true if the packet has been handled somehow, false if it should be queued
 func (t *switchTable) _handleIn(packet []byte, idle map[switchPort]struct{}, sending map[switchPort]struct{}) bool {
-	coords := switch_getPacketCoords(packet)
+	coords := switchGetPacketCoords(packet)
 	closer := t.getCloser(coords)
 	if len(closer) == 0 {
 		// TODO? call the router directly, and remove the whole concept of a self peer?
@@ -727,31 +726,31 @@ func (t *switchTable) _handleIn(packet []byte, idle map[switchPort]struct{}, sen
 }
 
 // Info about a buffered packet
-type switch_packetInfo struct {
+type switchPacketInfo struct {
 	bytes []byte
 	time  time.Time // Timestamp of when the packet arrived
 }
 
 // Used to keep track of buffered packets
-type switch_buffer struct {
-	packets []switch_packetInfo // Currently buffered packets, which may be dropped if it grows too large
+type switchBuffer struct {
+	packets []switchPacketInfo // Currently buffered packets, which may be dropped if it grows too large
 	size    uint64              // Total queue size in bytes
 }
 
-type switch_buffers struct {
+type switchBuffers struct {
 	totalMaxSize uint64
-	bufs         map[string]switch_buffer // Buffers indexed by StreamID
+	bufs         map[string]switchBuffer // Buffers indexed by StreamID
 	size         uint64                   // Total size of all buffers, in bytes
 	maxbufs      int
 	maxsize      uint64
 	closer       []closerInfo // Scratch space
 }
 
-func (b *switch_buffers) _cleanup(t *switchTable) {
+func (b *switchBuffers) _cleanup(t *switchTable) {
 	for streamID, buf := range b.bufs {
 		// Remove queues for which we have no next hop
 		packet := buf.packets[0]
-		coords := switch_getPacketCoords(packet.bytes)
+		coords := switchGetPacketCoords(packet.bytes)
 		if len(t.getCloser(coords)) == 0 {
 			for _, packet := range buf.packets {
 				util.PutBytes(packet.bytes)
@@ -770,7 +769,7 @@ func (b *switch_buffers) _cleanup(t *switchTable) {
 			if size < target {
 				continue
 			}
-			var packet switch_packetInfo
+			var packet switchPacketInfo
 			packet, buf.packets = buf.packets[0], buf.packets[1:]
 			buf.size -= uint64(len(packet.bytes))
 			b.size -= uint64(len(packet.bytes))
@@ -806,7 +805,7 @@ func (t *switchTable) _handleIdle(port switchPort) bool {
 			// Filter over the streams that this node is closer to
 			// Keep the one with the smallest queue
 			packet := buf.packets[0]
-			coords := switch_getPacketCoords(packet.bytes)
+			coords := switchGetPacketCoords(packet.bytes)
 			priority := float64(now.Sub(packet.time)) / float64(buf.size)
 			if priority >= bestPriority && t.portIsCloser(coords, port) {
 				best = streamID
@@ -815,7 +814,7 @@ func (t *switchTable) _handleIdle(port switchPort) bool {
 		}
 		if best != "" {
 			buf := t.queues.bufs[best]
-			var packet switch_packetInfo
+			var packet switchPacketInfo
 			// TODO decide if this should be LIFO or FIFO
 			packet, buf.packets = buf.packets[0], buf.packets[1:]
 			buf.size -= uint64(len(packet.bytes))
@@ -850,8 +849,8 @@ func (t *switchTable) _packetIn(bytes []byte) {
 	// Try to send it somewhere (or drop it if it's corrupt or at a dead end)
 	if !t._handleIn(bytes, t.idle, t.sending) {
 		// There's nobody free to take it right now, so queue it for later
-		packet := switch_packetInfo{bytes, time.Now()}
-		streamID := switch_getPacketStreamID(packet.bytes)
+		packet := switchPacketInfo{bytes, time.Now()}
+		streamID := switchGetPacketStreamID(packet.bytes)
 		buf, bufExists := t.queues.bufs[streamID]
 		buf.packets = append(buf.packets, packet)
 		buf.size += uint64(len(packet.bytes))

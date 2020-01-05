@@ -34,7 +34,7 @@ type Multicast struct {
 }
 
 type listenerInfo struct {
-	listener *yggdrasil.TcpListener
+	listener *yggdrasil.TCPListener
 	time     time.Time
 	interval time.Duration
 }

@@ -76,7 +76,7 @@ func (s *stream) _sendMetaBytes(metaBytes []byte) error {
 
 // Reads metadata bytes without stream padding, meant to be temporary
 func (s *stream) _recvMetaBytes() ([]byte, error) {
-	var meta version_metadata
+	var meta versionMetadata
 	frag := meta.encode()
 	metaBytes := make([]byte, 0, len(frag))
 	for len(metaBytes) < len(frag) {

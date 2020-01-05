@@ -9,7 +9,7 @@ import "github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 // This is the version-specific metadata exchanged at the start of a connection.
 // It must always begin with the 4 bytes "meta" and a wire formatted uint64 major version number.
 // The current version also includes a minor version number, and the box/sig/link keys that need to be exchanged to open a connection.
-type version_metadata struct {
+type versionMetadata struct {
 	meta [4]byte
 	ver  uint64 // 1 byte in this version
 	// Everything after this point potentially depends on the version number, and is subject to change in future versions
@@ -20,8 +20,8 @@ type version_metadata struct {
 }
 
 // Gets a base metadata with no keys set, but with the correct version numbers.
-func version_getBaseMetadata() version_metadata {
-	return version_metadata{
+func versionGetBaseMetadata() versionMetadata {
+	return versionMetadata{
 		meta:     [4]byte{'m', 'e', 't', 'a'},
 		ver:      0,
 		minorVer: 2,
@@ -29,10 +29,10 @@ func version_getBaseMetadata() version_metadata {
 }
 
 // Gest the length of the metadata for this version, used to know how many bytes to read from the start of a connection.
-func version_getMetaLength() (mlen int) {
+func versionGetMetaLength() (mlen int) {
 	mlen += 4                   // meta
-	mlen += 1                   // ver, as long as it's < 127, which it is in this version
-	mlen += 1                   // minorVer, as long as it's < 127, which it is in this version
+	mlen ++                     // ver, as long as it's < 127, which it is in this version
+	mlen ++                     // minorVer, as long as it's < 127, which it is in this version
 	mlen += crypto.BoxPubKeyLen // box
 	mlen += crypto.SigPubKeyLen // sig
 	mlen += crypto.BoxPubKeyLen // link
@@ -40,22 +40,22 @@ func version_getMetaLength() (mlen int) {
 }
 
 // Encodes version metadata into its wire format.
-func (m *version_metadata) encode() []byte {
-	bs := make([]byte, 0, version_getMetaLength())
+func (m *versionMetadata) encode() []byte {
+	bs := make([]byte, 0, versionGetMetaLength())
 	bs = append(bs, m.meta[:]...)
 	bs = append(bs, wire_encode_uint64(m.ver)...)
 	bs = append(bs, wire_encode_uint64(m.minorVer)...)
 	bs = append(bs, m.box[:]...)
 	bs = append(bs, m.sig[:]...)
 	bs = append(bs, m.link[:]...)
-	if len(bs) != version_getMetaLength() {
+	if len(bs) != versionGetMetaLength() {
 		panic("Inconsistent metadata length")
 	}
 	return bs
 }
 
 // Decodes version metadata from its wire format into the struct.
-func (m *version_metadata) decode(bs []byte) bool {
+func (m *versionMetadata) decode(bs []byte) bool {
 	switch {
 	case !wire_chop_slice(m.meta[:], &bs):
 		return false
@@ -74,7 +74,7 @@ func (m *version_metadata) decode(bs []byte) bool {
 }
 
 // Checks that the "meta" bytes and the version numbers are the expected values.
-func (m *version_metadata) check() bool {
-	base := version_getBaseMetadata()
+func (m *versionMetadata) check() bool {
+	base := versionGetBaseMetadata()
 	return base.meta == m.meta && base.ver == m.ver && base.minorVer == m.minorVer
 }

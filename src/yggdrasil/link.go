@@ -153,7 +153,7 @@ func (l *link) stop() error {
 func (intf *linkInterface) handler() error {
 	// TODO split some of this into shorter functions, so it's easier to read, and for the FIXME duplicate peer issue mentioned later
 	myLinkPub, myLinkPriv := crypto.NewBoxKeys()
-	meta := version_getBaseMetadata()
+	meta := versionGetBaseMetadata()
 	meta.box = intf.link.core.boxPub
 	meta.sig = intf.link.core.sigPub
 	meta.link = *myLinkPub
@@ -172,11 +172,11 @@ func (intf *linkInterface) handler() error {
 	if err != nil {
 		return err
 	}
-	meta = version_metadata{}
+	meta = versionMetadata{}
 	if !meta.decode(metaBytes) || !meta.check() {
 		return errors.New("failed to decode metadata")
 	}
-	base := version_getBaseMetadata()
+	base := versionGetBaseMetadata()
 	if meta.ver > base.ver || meta.ver == base.ver && meta.minorVer > base.minorVer {
 		intf.link.core.log.Errorln("Failed to connect to node: " + intf.name + " version: " + fmt.Sprintf("%d.%d", meta.ver, meta.minorVer))
 		return errors.New("failed to connect: wrong version")
@@ -203,17 +203,16 @@ func (intf *linkInterface) handler() error {
 			<-oldIntf.closed
 		}
 		return nil
-	} else {
-		intf.closed = make(chan struct{})
-		intf.link.interfaces[intf.info] = intf
-		defer func() {
-			intf.link.mutex.Lock()
-			delete(intf.link.interfaces, intf.info)
-			intf.link.mutex.Unlock()
-			close(intf.closed)
-		}()
-		intf.link.core.log.Debugln("DEBUG: registered interface for", intf.name)
 	}
+	intf.closed = make(chan struct{})
+	intf.link.interfaces[intf.info] = intf
+	defer func() {
+		intf.link.mutex.Lock()
+		delete(intf.link.interfaces, intf.info)
+		intf.link.mutex.Unlock()
+		close(intf.closed)
+	}()
+	intf.link.core.log.Debugln("DEBUG: registered interface for", intf.name)
 	intf.link.mutex.Unlock()
 	// Create peer
 	shared := crypto.GetSharedKey(myLinkPriv, &meta.link)
@@ -268,7 +267,7 @@ const (
 	sendTime      = 1 * time.Second    // How long to wait before deciding a send is blocked
 	keepAliveTime = 2 * time.Second    // How long to wait before sending a keep-alive response if we have no real traffic to send
 	stallTime     = 6 * time.Second    // How long to wait for response traffic before deciding the connection has stalled
-	closeTime     = 2 * switch_timeout // How long to wait before closing the link
+	closeTime     = 2 * switchTimeout // How long to wait before closing the link
 )
 
 // notify the intf that we're currently sending

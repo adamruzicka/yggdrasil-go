@@ -179,7 +179,7 @@ func (c *Core) GetDHT() []DHTEntry {
 			dhtentry = append(dhtentry, v)
 		}
 		sort.SliceStable(dhtentry, func(i, j int) bool {
-			return dht_ordered(&c.router.dht.nodeID, dhtentry[i].getNodeID(), dhtentry[j].getNodeID())
+			return dhtOrdered(&c.router.dht.nodeID, dhtentry[i].getNodeID(), dhtentry[j].getNodeID())
 		})
 		for _, v := range dhtentry {
 			info := DHTEntry{
@@ -279,14 +279,14 @@ func (c *Core) ConnDialer() (*Dialer, error) {
 // ListenTCP starts a new TCP listener. The input URI should match that of the
 // "Listen" configuration item, e.g.
 // 		tcp://a.b.c.d:e
-func (c *Core) ListenTCP(uri string) (*TcpListener, error) {
+func (c *Core) ListenTCP(uri string) (*TCPListener, error) {
 	return c.link.tcp.listen(uri, nil)
 }
 
 // ListenTLS starts a new TLS listener. The input URI should match that of the
 // "Listen" configuration item, e.g.
 // 		tls://a.b.c.d:e
-func (c *Core) ListenTLS(uri string) (*TcpListener, error) {
+func (c *Core) ListenTLS(uri string) (*TCPListener, error) {
 	return c.link.tcp.listen(uri, c.link.tcp.tls.forListener)
 }
 

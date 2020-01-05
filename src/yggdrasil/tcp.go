@@ -28,36 +28,36 @@ import (
 	"github.com/yggdrasil-network/yggdrasil-go/src/util"
 )
 
-const default_timeout = 6 * time.Second
-const tcp_ping_interval = (default_timeout * 2 / 3)
+const defaultTimeout = 6 * time.Second
+const tcpPingInterval = (defaultTimeout * 2 / 3)
 
 // The TCP listener and information about active TCP connections, to avoid duplication.
 type tcp struct {
 	link      *link
 	waitgroup sync.WaitGroup
 	mutex     sync.Mutex // Protecting the below
-	listeners map[string]*TcpListener
+	listeners map[string]*TCPListener
 	calls     map[string]struct{}
 	conns     map[linkInfo](chan struct{})
 	tls       tcptls
 }
 
-// TcpListener is a stoppable TCP listener interface. These are typically
+// TCPListener is a stoppable TCP listener interface. These are typically
 // returned from calls to the ListenTCP() function and are also used internally
 // to represent listeners created by the "Listen" configuration option and for
 // multicast interfaces.
-type TcpListener struct {
+type TCPListener struct {
 	Listener net.Listener
-	upgrade  *TcpUpgrade
+	upgrade  *TCPUpgrade
 	stop     chan struct{}
 }
 
-type TcpUpgrade struct {
+type TCPUpgrade struct {
 	upgrade func(c net.Conn) (net.Conn, error)
 	name    string
 }
 
-func (l *TcpListener) Stop() {
+func (l *TCPListener) Stop() {
 	defer func() { recover() }()
 	close(l.stop)
 }
@@ -92,7 +92,7 @@ func (t *tcp) init(l *link) error {
 	t.mutex.Lock()
 	t.calls = make(map[string]struct{})
 	t.conns = make(map[linkInfo](chan struct{}))
-	t.listeners = make(map[string]*TcpListener)
+	t.listeners = make(map[string]*TCPListener)
 	t.mutex.Unlock()
 
 	t.link.core.config.Mutex.RLock()
@@ -162,7 +162,7 @@ func (t *tcp) reconfigure() {
 	}
 }
 
-func (t *tcp) listen(listenaddr string, upgrade *TcpUpgrade) (*TcpListener, error) {
+func (t *tcp) listen(listenaddr string, upgrade *TCPUpgrade) (*TCPListener, error) {
 	var err error
 
 	ctx := context.Background()
@@ -171,7 +171,7 @@ func (t *tcp) listen(listenaddr string, upgrade *TcpUpgrade) (*TcpListener, erro
 	}
 	listener, err := lc.Listen(ctx, "tcp", listenaddr)
 	if err == nil {
-		l := TcpListener{
+		l := TCPListener{
 			Listener: listener,
 			upgrade:  upgrade,
 			stop:     make(chan struct{}),
@@ -185,7 +185,7 @@ func (t *tcp) listen(listenaddr string, upgrade *TcpUpgrade) (*TcpListener, erro
 }
 
 // Runs the listener, which spawns off goroutines for incoming connections.
-func (t *tcp) listener(l *TcpListener, listenaddr string) {
+func (t *tcp) listener(l *TCPListener, listenaddr string) {
 	defer t.waitgroup.Done()
 	if l == nil {
 		return
@@ -196,10 +196,9 @@ func (t *tcp) listener(l *TcpListener, listenaddr string) {
 		t.mutex.Unlock()
 		l.Listener.Close()
 		return
-	} else {
-		t.listeners[listenaddr] = l
-		t.mutex.Unlock()
 	}
+	t.listeners[listenaddr] = l
+	t.mutex.Unlock()
 	// And here we go!
 	defer func() {
 		t.link.core.log.Infoln("Stopping TCP listener on:", l.Listener.Addr().String())
@@ -239,7 +238,7 @@ func (t *tcp) startCalling(saddr string) bool {
 // If the dial is successful, it launches the handler.
 // When finished, it removes the outgoing call, so reconnection attempts can be made later.
 // This all happens in a separate goroutine that it spawns.
-func (t *tcp) call(saddr string, options interface{}, sintf string, upgrade *TcpUpgrade) {
+func (t *tcp) call(saddr string, options interface{}, sintf string, upgrade *TCPUpgrade) {
 	go func() {
 		callname := saddr
 		callproto := "TCP"
@@ -255,7 +254,7 @@ func (t *tcp) call(saddr string, options interface{}, sintf string, upgrade *Tcp
 		defer func() {
 			// Block new calls for a little while, to mitigate livelock scenarios
 			rand.Seed(time.Now().UnixNano())
-			delay := default_timeout + time.Duration(rand.Intn(10000))*time.Millisecond
+			delay := defaultTimeout + time.Duration(rand.Intn(10000))*time.Millisecond
 			time.Sleep(delay)
 			t.mutex.Lock()
 			delete(t.calls, callname)
@@ -353,7 +352,7 @@ func (t *tcp) call(saddr string, options interface{}, sintf string, upgrade *Tcp
 	}()
 }
 
-func (t *tcp) handler(sock net.Conn, incoming bool, options interface{}, upgrade *TcpUpgrade) {
+func (t *tcp) handler(sock net.Conn, incoming bool, options interface{}, upgrade *TCPUpgrade) {
 	defer t.waitgroup.Done() // Happens after sock.close
 	defer sock.Close()
 	t.setExtraOptions(sock)
@@ -363,9 +362,8 @@ func (t *tcp) handler(sock net.Conn, incoming bool, options interface{}, upgrade
 		if sock, err = upgrade.upgrade(sock); err != nil {
 			t.link.core.log.Errorln("TCP handler upgrade failed:", err)
 			return
-		} else {
-			upgraded = true
 		}
+		upgraded = true
 	}
 	stream := stream{}
 	stream.init(sock)

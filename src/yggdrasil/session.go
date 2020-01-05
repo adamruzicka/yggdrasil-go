@@ -252,9 +252,9 @@ func (ss *sessions) cleanup() {
 	ss.lastCleanup = time.Now()
 }
 
-func (sinfo *sessionInfo) doRemove() {
-	sinfo.sessions.router.Act(nil, func() {
-		sinfo.sessions.removeSession(sinfo)
+func (s *sessionInfo) doRemove() {
+	s.sessions.router.Act(nil, func() {
+		s.sessions.removeSession(s)
 	})
 }
 
@@ -267,18 +267,18 @@ func (ss *sessions) removeSession(sinfo *sessionInfo) {
 }
 
 // Returns a session ping appropriate for the given session info.
-func (sinfo *sessionInfo) _getPing() sessionPing {
-	loc := sinfo.sessions.router.core.switchTable.getLocator()
+func (s *sessionInfo) _getPing() sessionPing {
+	loc := s.sessions.router.core.switchTable.getLocator()
 	coords := loc.getCoords()
 	ping := sessionPing{
-		SendPermPub: sinfo.sessions.router.core.boxPub,
-		Handle:      sinfo.myHandle,
-		SendSesPub:  sinfo.mySesPub,
+		SendPermPub: s.sessions.router.core.boxPub,
+		Handle:      s.myHandle,
+		SendSesPub:  s.mySesPub,
 		Tstamp:      time.Now().Unix(),
 		Coords:      coords,
-		MTU:         sinfo.myMTU,
+		MTU:         s.myMTU,
 	}
-	sinfo.myNonce.Increment()
+	s.myNonce.Increment()
 	return ping
 }
 
@@ -306,38 +306,38 @@ func (ss *sessions) getSharedKey(myPriv *crypto.BoxPrivKey,
 }
 
 // Sends a session ping by calling sendPingPong in ping mode.
-func (sinfo *sessionInfo) ping(from phony.Actor) {
-	sinfo.Act(from, func() {
-		sinfo._sendPingPong(false)
+func (s *sessionInfo) ping(from phony.Actor) {
+	s.Act(from, func() {
+		s._sendPingPong(false)
 	})
 }
 
 // Calls getPing, sets the appropriate ping/pong flag, encodes to wire format, and send it.
 // Updates the time the last ping was sent in the session info.
-func (sinfo *sessionInfo) _sendPingPong(isPong bool) {
-	ping := sinfo._getPing()
+func (s *sessionInfo) _sendPingPong(isPong bool) {
+	ping := s._getPing()
 	ping.IsPong = isPong
 	bs := ping.encode()
-	payload, nonce := crypto.BoxSeal(&sinfo.sharedPermKey, bs, nil)
+	payload, nonce := crypto.BoxSeal(&s.sharedPermKey, bs, nil)
 	p := wire_protoTrafficPacket{
-		Coords:  sinfo.coords,
-		ToKey:   sinfo.theirPermPub,
-		FromKey: sinfo.sessions.router.core.boxPub,
+		Coords:  s.coords,
+		ToKey:   s.theirPermPub,
+		FromKey: s.sessions.router.core.boxPub,
 		Nonce:   *nonce,
 		Payload: payload,
 	}
 	packet := p.encode()
 	// TODO rewrite the below if/when the peer struct becomes an actor, to not go through the router first
-	sinfo.sessions.router.Act(sinfo, func() { sinfo.sessions.router.out(packet) })
-	if sinfo.pingTime.Before(sinfo.time) {
-		sinfo.pingTime = time.Now()
+	s.sessions.router.Act(s, func() { s.sessions.router.out(packet) })
+	if s.pingTime.Before(s.time) {
+		s.pingTime = time.Now()
 	}
 }
 
-func (sinfo *sessionInfo) setConn(from phony.Actor, conn *Conn) {
-	sinfo.Act(from, func() {
-		sinfo.conn = conn
-		sinfo.conn.setMTU(sinfo, sinfo._getMTU())
+func (s *sessionInfo) setConn(from phony.Actor, conn *Conn) {
+	s.Act(from, func() {
+		s.conn = conn
+		s.conn.setMTU(s, s._getMTU())
 	})
 }
 
@@ -385,32 +385,32 @@ func (ss *sessions) handlePing(ping *sessionPing) {
 // Get the MTU of the session.
 // Will be equal to the smaller of this node's MTU or the remote node's MTU.
 // If sending over links with a maximum message size (this was a thing with the old UDP code), it could be further lowered, to a minimum of 1280.
-func (sinfo *sessionInfo) _getMTU() uint16 {
-	if sinfo.theirMTU == 0 || sinfo.myMTU == 0 {
+func (s *sessionInfo) _getMTU() uint16 {
+	if s.theirMTU == 0 || s.myMTU == 0 {
 		return 0
 	}
-	if sinfo.theirMTU < sinfo.myMTU {
-		return sinfo.theirMTU
+	if s.theirMTU < s.myMTU {
+		return s.theirMTU
 	}
-	return sinfo.myMTU
+	return s.myMTU
 }
 
 // Checks if a packet's nonce is recent enough to fall within the window of allowed packets, and not already received.
-func (sinfo *sessionInfo) _nonceIsOK(theirNonce *crypto.BoxNonce) bool {
+func (s *sessionInfo) _nonceIsOK(theirNonce *crypto.BoxNonce) bool {
 	// The bitmask is to allow for some non-duplicate out-of-order packets
-	if theirNonce.Minus(&sinfo.theirNonce) > 0 {
+	if theirNonce.Minus(&s.theirNonce) > 0 {
 		// This is newer than the newest nonce we've seen
 		return true
 	}
-	return time.Since(sinfo.time) < nonceWindow
+	return time.Since(s.time) < nonceWindow
 }
 
 // Updates the nonce mask by (possibly) shifting the bitmask and setting the bit corresponding to this nonce to 1, and then updating the most recent nonce
-func (sinfo *sessionInfo) _updateNonce(theirNonce *crypto.BoxNonce) {
-	if theirNonce.Minus(&sinfo.theirNonce) > 0 {
+func (s *sessionInfo) _updateNonce(theirNonce *crypto.BoxNonce) {
+	if theirNonce.Minus(&s.theirNonce) > 0 {
 		// This nonce is the newest we've seen, so make a note of that
-		sinfo.theirNonce = *theirNonce
-		sinfo.time = time.Now()
+		s.theirNonce = *theirNonce
+		s.time = time.Now()
 	}
 }
 
@@ -447,25 +447,25 @@ type FlowKeyMessage struct {
 	Message []byte
 }
 
-func (sinfo *sessionInfo) recv(from phony.Actor, packet *wire_trafficPacket) {
-	sinfo.Act(from, func() {
-		sinfo._recvPacket(packet)
+func (s *sessionInfo) recv(from phony.Actor, packet *wire_trafficPacket) {
+	s.Act(from, func() {
+		s._recvPacket(packet)
 	})
 }
 
-func (sinfo *sessionInfo) _recvPacket(p *wire_trafficPacket) {
+func (s *sessionInfo) _recvPacket(p *wire_trafficPacket) {
 	select {
-	case <-sinfo.init:
+	case <-s.init:
 	default:
 		// TODO find a better way to drop things until initialized
 		util.PutBytes(p.Payload)
 		return
 	}
-	if !sinfo._nonceIsOK(&p.Nonce) {
+	if !s._nonceIsOK(&p.Nonce) {
 		util.PutBytes(p.Payload)
 		return
 	}
-	k := sinfo.sharedSesKey
+	k := s.sharedSesKey
 	var isOK bool
 	var bs []byte
 	ch := make(chan func(), 1)
@@ -473,44 +473,44 @@ func (sinfo *sessionInfo) _recvPacket(p *wire_trafficPacket) {
 		bs, isOK = crypto.BoxOpen(&k, p.Payload, &p.Nonce)
 		callback := func() {
 			util.PutBytes(p.Payload)
-			if !isOK || k != sinfo.sharedSesKey || !sinfo._nonceIsOK(&p.Nonce) {
+			if !isOK || k != s.sharedSesKey || !s._nonceIsOK(&p.Nonce) {
 				// Either we failed to decrypt, or the session was updated, or we
 				// received this packet in the mean time
 				util.PutBytes(bs)
 				return
 			}
-			sinfo._updateNonce(&p.Nonce)
-			sinfo.bytesRecvd += uint64(len(bs))
-			sinfo.conn.recvMsg(sinfo, bs)
+			s._updateNonce(&p.Nonce)
+			s.bytesRecvd += uint64(len(bs))
+			s.conn.recvMsg(s, bs)
 		}
 		ch <- callback
-		sinfo.checkCallbacks()
+		s.checkCallbacks()
 	}
-	sinfo.callbacks = append(sinfo.callbacks, ch)
-	manager.workerGo(sinfo, poolFunc)
+	s.callbacks = append(s.callbacks, ch)
+	manager.workerGo(s, poolFunc)
 }
 
-func (sinfo *sessionInfo) _send(msg FlowKeyMessage) {
+func (s *sessionInfo) _send(msg FlowKeyMessage) {
 	select {
-	case <-sinfo.init:
+	case <-s.init:
 	default:
 		// TODO find a better way to drop things until initialized
 		util.PutBytes(msg.Message)
 		return
 	}
-	sinfo.bytesSent += uint64(len(msg.Message))
-	coords := append([]byte(nil), sinfo.coords...)
+	s.bytesSent += uint64(len(msg.Message))
+	coords := append([]byte(nil), s.coords...)
 	if msg.FlowKey != 0 {
 		coords = append(coords, 0)
 		coords = append(coords, wire_encode_uint64(msg.FlowKey)...)
 	}
 	p := wire_trafficPacket{
 		Coords: coords,
-		Handle: sinfo.theirHandle,
-		Nonce:  sinfo.myNonce,
+		Handle: s.theirHandle,
+		Nonce:  s.myNonce,
 	}
-	sinfo.myNonce.Increment()
-	k := sinfo.sharedSesKey
+	s.myNonce.Increment()
+	k := s.sharedSesKey
 	ch := make(chan func(), 1)
 	poolFunc := func() {
 		p.Payload, _ = crypto.BoxSeal(&k, msg.Message, &p.Nonce)
@@ -522,25 +522,25 @@ func (sinfo *sessionInfo) _send(msg FlowKeyMessage) {
 			util.PutBytes(p.Payload)
 			// Send the packet
 			// TODO replace this with a send to the peer struct if that becomes an actor
-			sinfo.sessions.router.Act(sinfo, func() {
-				sinfo.sessions.router.out(packet)
+			s.sessions.router.Act(s, func() {
+				s.sessions.router.out(packet)
 			})
 		}
 		ch <- callback
-		sinfo.checkCallbacks()
+		s.checkCallbacks()
 	}
-	sinfo.callbacks = append(sinfo.callbacks, ch)
-	manager.workerGo(sinfo, poolFunc)
+	s.callbacks = append(s.callbacks, ch)
+	manager.workerGo(s, poolFunc)
 }
 
-func (sinfo *sessionInfo) checkCallbacks() {
-	sinfo.Act(nil, func() {
-		if len(sinfo.callbacks) > 0 {
+func (s *sessionInfo) checkCallbacks() {
+	s.Act(nil, func() {
+		if len(s.callbacks) > 0 {
 			select {
-			case callback := <-sinfo.callbacks[0]:
-				sinfo.callbacks = sinfo.callbacks[1:]
+			case callback := <-s.callbacks[0]:
+				s.callbacks = s.callbacks[1:]
 				callback()
-				sinfo.checkCallbacks()
+				s.checkCallbacks()
 			default:
 			}
 		}

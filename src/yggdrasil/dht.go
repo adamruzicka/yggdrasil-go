@@ -13,16 +13,16 @@ import (
 )
 
 const (
-	dht_lookup_size     = 16
-	dht_timeout         = 6 * time.Minute
-	dht_max_delay       = 5 * time.Minute
-	dht_max_delay_dirty = 30 * time.Second
+	dhtLookupSize     = 16
+	dhtTimeout         = 6 * time.Minute
+	dhtMaxDelay       = 5 * time.Minute
+	dhtMaxDelayDirty = 30 * time.Second
 )
 
 // dhtInfo represents everything we know about a node in the DHT.
 // This includes its key, a cache of its NodeID, coords, and timing/ping related info for deciding who/when to ping nodes for maintenance.
 type dhtInfo struct {
-	nodeID_hidden *crypto.NodeID
+	nodeIDHidden *crypto.NodeID
 	key           crypto.BoxPubKey
 	coords        []byte
 	recv          time.Time // When we last received a message
@@ -33,10 +33,10 @@ type dhtInfo struct {
 
 // Returns the *NodeID associated with dhtInfo.key, calculating it on the fly the first time or from a cache all subsequent times.
 func (info *dhtInfo) getNodeID() *crypto.NodeID {
-	if info.nodeID_hidden == nil {
-		info.nodeID_hidden = crypto.GetNodeID(&info.key)
+	if info.nodeIDHidden == nil {
+		info.nodeIDHidden = crypto.GetNodeID(&info.key)
 	}
-	return info.nodeID_hidden
+	return info.nodeIDHidden
 }
 
 // Request for a node to do a lookup.
@@ -68,7 +68,7 @@ type dht struct {
 	router    *router
 	nodeID    crypto.NodeID
 	reqs      map[dhtReqKey]time.Time          // Keeps track of recent outstanding requests
-	callbacks map[dhtReqKey][]dht_callbackInfo // Search and admin lookup callbacks
+	callbacks map[dhtReqKey][]dhtCallbackInfo // Search and admin lookup callbacks
 	// These next two could be replaced by a single linked list or similar...
 	table map[crypto.NodeID]*dhtInfo
 	imp   []*dhtInfo
@@ -78,7 +78,7 @@ type dht struct {
 func (t *dht) init(r *router) {
 	t.router = r
 	t.nodeID = *t.router.core.NodeID()
-	t.callbacks = make(map[dhtReqKey][]dht_callbackInfo)
+	t.callbacks = make(map[dhtReqKey][]dhtCallbackInfo)
 	t.reset()
 }
 
@@ -94,23 +94,23 @@ func (t *dht) reset() {
 	t.imp = nil
 }
 
-// Does a DHT lookup and returns up to dht_lookup_size results.
+// Does a DHT lookup and returns up to dhtLookupSize results.
 func (t *dht) lookup(nodeID *crypto.NodeID, everything bool) []*dhtInfo {
 	results := make([]*dhtInfo, 0, len(t.table))
 	for _, info := range t.table {
 		results = append(results, info)
 	}
-	if len(results) > dht_lookup_size {
+	if len(results) > dhtLookupSize {
 		// Drop the middle part, so we keep some nodes before and after.
 		// This should help to bootstrap / recover more quickly.
 		sort.SliceStable(results, func(i, j int) bool {
-			return dht_ordered(nodeID, results[i].getNodeID(), results[j].getNodeID())
+			return dhtOrdered(nodeID, results[i].getNodeID(), results[j].getNodeID())
 		})
 		newRes := make([]*dhtInfo, 0, len(results))
-		newRes = append(newRes, results[len(results)-dht_lookup_size/2:]...)
-		newRes = append(newRes, results[:len(results)-dht_lookup_size/2]...)
+		newRes = append(newRes, results[len(results)-dhtLookupSize/2:]...)
+		newRes = append(newRes, results[:len(results)-dhtLookupSize/2]...)
 		results = newRes
-		results = results[:dht_lookup_size]
+		results = results[:dhtLookupSize]
 	}
 	return results
 }
@@ -145,7 +145,7 @@ func (t *dht) insert(info *dhtInfo) {
 // Insert a peer into the table if it hasn't been pinged lately, to keep peers from dropping
 func (t *dht) insertPeer(info *dhtInfo) {
 	oldInfo, isIn := t.table[*info.getNodeID()]
-	if !isIn || time.Since(oldInfo.recv) > dht_max_delay+30*time.Second {
+	if !isIn || time.Since(oldInfo.recv) > dhtMaxDelay+30*time.Second {
 		// TODO? also check coords?
 		newInfo := *info // Insert a copy
 		t.insert(&newInfo)
@@ -153,7 +153,7 @@ func (t *dht) insertPeer(info *dhtInfo) {
 }
 
 // Return true if first/second/third are (partially) ordered correctly.
-func dht_ordered(first, second, third *crypto.NodeID) bool {
+func dhtOrdered(first, second, third *crypto.NodeID) bool {
 	lessOrEqual := func(first, second *crypto.NodeID) bool {
 		for idx := 0; idx < crypto.NodeIDLen; idx++ {
 			if first[idx] > second[idx] {
@@ -230,14 +230,14 @@ func (t *dht) sendRes(res *dhtRes, req *dhtReq) {
 	t.router.out(packet)
 }
 
-type dht_callbackInfo struct {
+type dhtCallbackInfo struct {
 	f    func(*dhtRes)
 	time time.Time
 }
 
 // Adds a callback and removes it after some timeout.
 func (t *dht) addCallback(rq *dhtReqKey, callback func(*dhtRes)) {
-	info := dht_callbackInfo{callback, time.Now().Add(6 * time.Second)}
+	info := dhtCallbackInfo{callback, time.Now().Add(6 * time.Second)}
 	t.callbacks[*rq] = append(t.callbacks[*rq], info)
 }
 
@@ -322,7 +322,7 @@ func (t *dht) doMaintenance() {
 		}
 	}
 	t.reqs = newReqs
-	newCallbacks := make(map[dhtReqKey][]dht_callbackInfo, len(t.callbacks))
+	newCallbacks := make(map[dhtReqKey][]dhtCallbackInfo, len(t.callbacks))
 	for key, cs := range t.callbacks {
 		for _, c := range cs {
 			if now.Before(c.time) {
@@ -339,10 +339,10 @@ func (t *dht) doMaintenance() {
 		case info.pings > 6:
 			// It failed to respond to too many pings
 			fallthrough
-		case now.Sub(info.recv) > dht_timeout:
+		case now.Sub(info.recv) > dhtTimeout:
 			// It's too old
 			fallthrough
-		case info.dirty && now.Sub(info.recv) > dht_max_delay_dirty && !t.isImportant(info):
+		case info.dirty && now.Sub(info.recv) > dhtMaxDelayDirty && !t.isImportant(info):
 			// We won't ping it to refresh it, so just drop it
 			delete(t.table, infoID)
 			t.imp = nil
@@ -354,11 +354,11 @@ func (t *dht) doMaintenance() {
 			info.throttle *= 2
 			if info.throttle < time.Second {
 				info.throttle = time.Second
-			} else if info.throttle > dht_max_delay {
-				info.throttle = dht_max_delay
+			} else if info.throttle > dhtMaxDelay {
+				info.throttle = dhtMaxDelay
 			}
 			fallthrough
-		case info.dirty && now.Sub(info.recv) > dht_max_delay_dirty:
+		case info.dirty && now.Sub(info.recv) > dhtMaxDelayDirty:
 			t.ping(info, nil)
 			info.pings++
 		}
@@ -376,7 +376,7 @@ func (t *dht) getImportant() []*dhtInfo {
 		// Sort them by increasing order in distance along the ring
 		sort.SliceStable(infos, func(i, j int) bool {
 			// Sort in order of predecessors (!), reverse from chord normal, because it plays nicer with zero bits for unknown parts of target addresses
-			return dht_ordered(infos[j].getNodeID(), infos[i].getNodeID(), &t.nodeID)
+			return dhtOrdered(infos[j].getNodeID(), infos[i].getNodeID(), &t.nodeID)
 		})
 		// Keep the ones that are no further than the closest seen so far
 		minDist := ^uint64(0)
@@ -419,7 +419,7 @@ func (t *dht) isImportant(ninfo *dhtInfo) bool {
 	minDist := ^uint64(0)
 	for _, info := range important {
 		if (*info.getNodeID() == *ninfo.getNodeID()) ||
-			(ndist < minDist && dht_ordered(info.getNodeID(), ninfo.getNodeID(), &t.nodeID)) {
+			(ndist < minDist && dhtOrdered(info.getNodeID(), ninfo.getNodeID(), &t.nodeID)) {
 			// Either the same node, or a better one
 			return true
 		}
@@ -432,7 +432,7 @@ func (t *dht) isImportant(ninfo *dhtInfo) bool {
 	for idx := len(important) - 1; idx >= 0; idx-- {
 		info := important[idx]
 		if (*info.getNodeID() == *ninfo.getNodeID()) ||
-			(ndist < minDist && dht_ordered(&t.nodeID, ninfo.getNodeID(), info.getNodeID())) {
+			(ndist < minDist && dhtOrdered(&t.nodeID, ninfo.getNodeID(), info.getNodeID())) {
 			// Either the same node, or a better one
 			return true
 		}

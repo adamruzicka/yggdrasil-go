@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	wire_Traffic             = iota // data being routed somewhere, handle for crypto
-	wire_ProtocolTraffic            // protocol traffic, pub keys for crypto
-	wire_LinkProtocolTraffic        // link proto traffic, pub keys for crypto
-	wire_SwitchMsg                  // inside link protocol traffic header
-	wire_SessionPing                // inside protocol traffic header
-	wire_SessionPong                // inside protocol traffic header
+	wireTraffic             = iota // data being routed somewhere, handle for crypto
+	wireProtocolTraffic            // protocol traffic, pub keys for crypto
+	wireLinkProtocolTraffic        // link proto traffic, pub keys for crypto
+	wireSwitchMsg                  // inside link protocol traffic header
+	wireSessionPing                // inside protocol traffic header
+	wireSessionPong                // inside protocol traffic header
 	wire_DHTLookupRequest           // inside protocol traffic header
 	wire_DHTLookupResponse          // inside protocol traffic header
 	wire_NodeInfoRequest            // inside protocol traffic header
@@ -142,7 +142,7 @@ func wire_coordsBytestoUint64s(in []byte) (out []uint64) {
 
 // Encodes a swtichMsg into its wire format.
 func (m *switchMsg) encode() []byte {
-	bs := wire_encode_uint64(wire_SwitchMsg)
+	bs := wire_encode_uint64(wireSwitchMsg)
 	bs = append(bs, m.Root[:]...)
 	bs = append(bs, wire_encode_uint64(wire_intToUint(m.TStamp))...)
 	for _, hop := range m.Hops {
@@ -160,7 +160,7 @@ func (m *switchMsg) decode(bs []byte) bool {
 	switch {
 	case !wire_chop_uint64(&pType, &bs):
 		return false
-	case pType != wire_SwitchMsg:
+	case pType != wireSwitchMsg:
 		return false
 	case !wire_chop_slice(m.Root[:], &bs):
 		return false
@@ -232,7 +232,7 @@ type wire_trafficPacket struct {
 // Encodes a wire_trafficPacket into its wire format.
 func (p *wire_trafficPacket) encode() []byte {
 	bs := util.GetBytes()
-	bs = wire_put_uint64(wire_Traffic, bs)
+	bs = wire_put_uint64(wireTraffic, bs)
 	bs = wire_put_coords(p.Coords, bs)
 	bs = append(bs, p.Handle[:]...)
 	bs = append(bs, p.Nonce[:]...)
@@ -246,7 +246,7 @@ func (p *wire_trafficPacket) decode(bs []byte) bool {
 	switch {
 	case !wire_chop_uint64(&pType, &bs):
 		return false
-	case pType != wire_Traffic:
+	case pType != wireTraffic:
 		return false
 	case !wire_chop_coords(&p.Coords, &bs):
 		return false
@@ -271,7 +271,7 @@ type wire_protoTrafficPacket struct {
 // Encodes a wire_protoTrafficPacket into its wire format.
 func (p *wire_protoTrafficPacket) encode() []byte {
 	coords := wire_encode_coords(p.Coords)
-	bs := wire_encode_uint64(wire_ProtocolTraffic)
+	bs := wire_encode_uint64(wireProtocolTraffic)
 	bs = append(bs, coords...)
 	bs = append(bs, p.ToKey[:]...)
 	bs = append(bs, p.FromKey[:]...)
@@ -286,7 +286,7 @@ func (p *wire_protoTrafficPacket) decode(bs []byte) bool {
 	switch {
 	case !wire_chop_uint64(&pType, &bs):
 		return false
-	case pType != wire_ProtocolTraffic:
+	case pType != wireProtocolTraffic:
 		return false
 	case !wire_chop_coords(&p.Coords, &bs):
 		return false
@@ -312,7 +312,7 @@ type wire_linkProtoTrafficPacket struct {
 
 // Encodes a wire_linkProtoTrafficPacket into its wire format.
 func (p *wire_linkProtoTrafficPacket) encode() []byte {
-	bs := wire_encode_uint64(wire_LinkProtocolTraffic)
+	bs := wire_encode_uint64(wireLinkProtocolTraffic)
 	bs = append(bs, p.Nonce[:]...)
 	bs = append(bs, p.Payload...)
 	return bs
@@ -324,7 +324,7 @@ func (p *wire_linkProtoTrafficPacket) decode(bs []byte) bool {
 	switch {
 	case !wire_chop_uint64(&pType, &bs):
 		return false
-	case pType != wire_LinkProtocolTraffic:
+	case pType != wireLinkProtocolTraffic:
 		return false
 	case !wire_chop_slice(p.Nonce[:], &bs):
 		return false
@@ -339,9 +339,9 @@ func (p *wire_linkProtoTrafficPacket) decode(bs []byte) bool {
 func (p *sessionPing) encode() []byte {
 	var pTypeVal uint64
 	if p.IsPong {
-		pTypeVal = wire_SessionPong
+		pTypeVal = wireSessionPong
 	} else {
-		pTypeVal = wire_SessionPing
+		pTypeVal = wireSessionPing
 	}
 	bs := wire_encode_uint64(pTypeVal)
 	//p.sendPermPub used in top level (crypto), so skipped here
@@ -362,7 +362,7 @@ func (p *sessionPing) decode(bs []byte) bool {
 	switch {
 	case !wire_chop_uint64(&pType, &bs):
 		return false
-	case pType != wire_SessionPing && pType != wire_SessionPong:
+	case pType != wireSessionPing && pType != wireSessionPong:
 		return false
 		//p.sendPermPub used in top level (crypto), so skipped here
 	case !wire_chop_slice(p.Handle[:], &bs):
@@ -377,7 +377,7 @@ func (p *sessionPing) decode(bs []byte) bool {
 		mtu = 1280
 	}
 	p.Tstamp = wire_intFromUint(tstamp)
-	if pType == wire_SessionPong {
+	if pType == wireSessionPong {
 		p.IsPong = true
 	}
 	p.MTU = uint16(mtu)

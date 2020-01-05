@@ -222,11 +222,11 @@ func (p *peer) _handlePacket(packet []byte) {
 		return
 	}
 	switch pType {
-	case wire_Traffic:
+	case wireTraffic:
 		p._handleTraffic(packet)
-	case wire_ProtocolTraffic:
+	case wireProtocolTraffic:
 		p._handleTraffic(packet)
-	case wire_LinkProtocolTraffic:
+	case wireLinkProtocolTraffic:
 		p._handleLinkTraffic(packet)
 	default:
 		util.PutBytes(packet)
@@ -304,7 +304,7 @@ func (p *peer) _handleLinkTraffic(bs []byte) {
 		return
 	}
 	switch pType {
-	case wire_SwitchMsg:
+	case wireSwitchMsg:
 		p._handleSwitchMsg(payload)
 	default:
 		util.PutBytes(bs)
