@@ -15,16 +15,16 @@ type Cancellation interface {
 	Error() error              // Error returns the error provided to Cancel, or nil if no error has been provided.
 }
 
-// CancellationFinalized is an error returned if a cancellation object was garbage collected and the finalizer was run.
+// ErrCancellationFinalized is an error returned if a cancellation object was garbage collected and the finalizer was run.
 // If you ever see this, then you're probably doing something wrong with your code.
-var CancellationFinalized = errors.New("finalizer called")
+var ErrCancellationFinalized = errors.New("finalizer called")
 
-// CancellationTimeoutError is used when a CancellationWithTimeout or CancellationWithDeadline is cancelled due to said timeout.
-var CancellationTimeoutError = errors.New("timeout")
+// ErrCancellationTimeout is used when a CancellationWithTimeout or CancellationWithDeadline is cancelled due to said timeout.
+var ErrCancellationTimeout = errors.New("timeout")
 
 // CancellationFinalizer is set as a finalizer when creating a new cancellation with NewCancellation(), and generally shouldn't be needed by the user, but is included in case other implementations of the same interface want to make use of it.
 func CancellationFinalizer(c Cancellation) {
-	c.Cancel(CancellationFinalized)
+	c.Cancel(ErrCancellationFinalized)
 }
 
 type cancellation struct {
@@ -54,12 +54,11 @@ func (c *cancellation) Cancel(err error) error {
 	defer c.mutex.Unlock()
 	if c.done {
 		return c.err
-	} else {
-		c.err = err
-		c.done = true
-		close(c.cancel)
-		return nil
 	}
+	c.err = err
+	c.done = true
+	close(c.cancel)
+	return nil
 }
 
 // Error returns the error provided to Cancel, or nil if no error has been provided.
@@ -83,7 +82,7 @@ func CancellationChild(parent Cancellation) Cancellation {
 	return child
 }
 
-// CancellationWithTimeout returns a ChildCancellation that will automatically be Cancelled with a CancellationTimeoutError after the timeout.
+// CancellationWithTimeout returns a ChildCancellation that will automatically be Cancelled with a ErrCancellationTimeout after the timeout.
 func CancellationWithTimeout(parent Cancellation, timeout time.Duration) Cancellation {
 	child := CancellationChild(parent)
 	go func() {
@@ -92,13 +91,13 @@ func CancellationWithTimeout(parent Cancellation, timeout time.Duration) Cancell
 		select {
 		case <-child.Finished():
 		case <-timer.C:
-			child.Cancel(CancellationTimeoutError)
+			child.Cancel(ErrCancellationTimeout)
 		}
 	}()
 	return child
 }
 
-// CancellationWithTimeout returns a ChildCancellation that will automatically be Cancelled with a CancellationTimeoutError after the specified deadline.
+// CancellationWithDeadline returns a ChildCancellation that will automatically be Cancelled with a ErrCancellationTimeout after the specified deadline.
 func CancellationWithDeadline(parent Cancellation, deadline time.Time) Cancellation {
 	return CancellationWithTimeout(parent, deadline.Sub(time.Now()))
 }

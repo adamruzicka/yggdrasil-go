@@ -219,7 +219,7 @@ func (c *Conn) readNoCopy() ([]byte, error) {
 	// Wait for some traffic to come through from the session
 	select {
 	case <-cancel.Finished():
-		if cancel.Error() == util.CancellationTimeoutError {
+		if cancel.Error() == util.ErrCancellationTimeout {
 			return nil, ConnError{errors.New("read timeout"), true, false, false, 0}
 		} else {
 			return nil, ConnError{errors.New("session closed"), false, false, true, 0}
@@ -299,7 +299,7 @@ func (c *Conn) writeNoCopy(msg FlowKeyMessage) error {
 	var err error
 	select {
 	case <-cancel.Finished():
-		if cancel.Error() == util.CancellationTimeoutError {
+		if cancel.Error() == util.ErrCancellationTimeout {
 			err = ConnError{errors.New("write timeout"), true, false, false, 0}
 		} else {
 			err = ConnError{errors.New("session closed"), false, false, true, 0}
