@@ -1,5 +1,5 @@
 /*
-The config package contains structures related to the configuration of an
+Package config contains structures related to the configuration of an
 Yggdrasil node.
 
 The configuration contains, amongst other things, encryption keys which are used
@@ -33,14 +33,14 @@ type NodeState struct {
 	Mutex    sync.RWMutex
 }
 
-// Current returns the active node configuration.
+// GetCurrent returns the active node configuration.
 func (s *NodeState) GetCurrent() NodeConfig {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 	return s.Current
 }
 
-// Previous returns the previous node configuration.
+// GetPrevious returns the previous node configuration.
 func (s *NodeState) GetPrevious() NodeConfig {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
@@ -105,7 +105,7 @@ type SwitchOptions struct {
 	MaxTotalQueueSize uint64 `comment:"Maximum size of all switch queues combined (in bytes)."`
 }
 
-// Generates default configuration and returns a pointer to the resulting
+// GenerateConfig Generates default configuration and returns a pointer to the resulting
 // NodeConfig. This is used when outputting the -genconf parameter and also when
 // using -autoconf.
 func GenerateConfig() *NodeConfig {
